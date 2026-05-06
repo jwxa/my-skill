@@ -1,6 +1,6 @@
 ---
 name: feishu-summary-sync
-description: Summarize web links or provided text into local Markdown notes, then sync them to Feishu Drive as docx documents and an annual index sheet. Use when handling信息概要汇总、URL摘要落盘、飞书文档同步、年度索引表维护、Feishu docx/sheet导入、或修复 lark-cli 在 Windows 下的参数与编码问题。
+description: Summarize web links or provided text into local Markdown notes, then sync them to Feishu Drive as docx documents and an annual index sheet. Use when handling信息概要汇总、URL摘要落盘、飞书文档同步、年度索引表维护、Feishu docx/sheet导入、或修复 lark-cli 在 Windows / Linux 下的参数、换行与编码问题。
 ---
 
 # Feishu Summary Sync
@@ -47,22 +47,25 @@ description: Summarize web links or provided text into local Markdown notes, the
   - 单范围：`PUT https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/<token>/values`
   - 批量：`POST https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/<token>/values_batch_update`
 
-可用命令示例：
+可用示例：
 
-```bash
-python - <<'PY'
-from pathlib import Path
-Path('.cache').mkdir(exist_ok=True)
-Path('.cache/sheets-write-data.json').write_text(
-    '{"valueRange":{"range":"0IRGkM!A8:B8","values":[["Hello",1]]}}',
-    encoding='utf-8'
-)
-Path('.cache/sheets-batch-data.json').write_text(
-    '{"valueRanges":[{"range":"0IRGkM!A9:B10","values":[["Batch1",1],["Batch2",2]]}]}',
-    encoding='utf-8'
-)
-PY
+先创建以下 JSON 文件，编码统一为 **UTF-8 无 BOM**：
 
+`.cache/sheets-write-data.json`
+
+```json
+{"valueRange":{"range":"0IRGkM!A8:B8","values":[["Hello",1]]}}
+```
+
+`.cache/sheets-batch-data.json`
+
+```json
+{"valueRanges":[{"range":"0IRGkM!A9:B10","values":[["Batch1",1],["Batch2",2]]}]}
+```
+
+然后执行：
+
+```text
 lark-cli api PUT https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/<token>/values --data @.cache/sheets-write-data.json
 lark-cli api POST https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/<token>/values_batch_update --data @.cache/sheets-batch-data.json
 ```
@@ -84,17 +87,31 @@ lark-cli api POST https://open.feishu.cn/open-apis/sheets/v2/spreadsheets/<token
 
 跨平台示例：
 
-```bash
-python - <<'PY'
-from pathlib import Path
-Path('params.json').write_text('{"file_token":"...","type":"docx"}', encoding='utf-8')
-Path('data.json').write_text('{"new_title":"..."}', encoding='utf-8')
-PY
+先创建以下 JSON 文件，编码统一为 **UTF-8 无 BOM**：
 
+`params.json`
+
+```json
+{"file_token":"...","type":"docx"}
+```
+
+`data.json`
+
+```json
+{"new_title":"..."}
+```
+
+然后执行：
+
+```text
 lark-cli drive files patch --params @params.json --data @data.json --yes
 ```
 
 ## 推荐工作流
+
+### 命令获取 URL 正文失败时的 fallback 流程
+
+当命令行抓取 URL 正文失败时，切到 [references/fallback-browser-fetch.md](references/fallback-browser-fetch.md)，按浏览器会话回退流程处理。
 
 ### 正文文档
 
@@ -118,6 +135,15 @@ lark-cli drive files patch --params @params.json --data @data.json --yes
 3. `range` 使用 `sheetId!A1:B2` 这种格式
 4. 写入前确保 JSON 是 **UTF-8 无 BOM**
 5. 写入后再次用 `lark-cli sheets +info` / `+read` 校验
+
+#### 编码补充
+
+- 即使 `Sheets API` 请求体本身是 UTF-8，**PowerShell 管道中的内联脚本** 仍可能把中文文件名或中文摘要变成 `????`
+- 当需要写入中文标题 / 摘要时，优先：
+  - 先把 Python 脚本写入 `.py` 文件，再执行
+  - 或先把 JSON 写入文件，再由 `lark-cli api ... --data @file` 读取
+- 不要依赖“直接把带中文的数据塞进 PowerShell heredoc 再管道给 Python”的方式，这在当前环境下不稳定
+- 为了兼容 Windows PowerShell 和 Linux shell，示例优先使用“先落 JSON 文件，再调用 `lark-cli`”的形式
 
 ## 验证清单
 
